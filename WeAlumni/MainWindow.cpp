@@ -1,4 +1,4 @@
-#include "MainWindow.h"
+﻿#include "MainWindow.h"
 #include <vector>
 /*
  * MainWindow.h
@@ -11,7 +11,9 @@
  *          4/12/20 add staff MainWindow and auth control for staff and member
  *          4/15/20 bug fix
  *          4/21/20 Added OPT MainWindow Part(Xiangdong Che)
- *
+ *          5/1/20 ui & auth update record & order
+ *          5/02/20 Changed layout of OPT part(Xiangdong Che)
+ *          5/2/20 Treasury MainWindow (Yiyun Zheng)
  */
 
 using namespace System;
@@ -52,10 +54,18 @@ Void WeAlumni::MainWindow::Initialize() {
     stf_GeneralInformation();
     stf_UpdateDataGridView(STF_SELECT_ALL);
     stf_CheckAuth();
+    Rec_GeneralInformation();
+    Rec_UpdateDataGridView(REC_SELECT_ALL);
+    Rec_CheckAuth();
     ord_UpdateDataGridView(ORD_SELECT_ALL);
     ord_GeneralInformation();
+    ord_CheckAuth();
     OPT_UpdateDataGridView(OPT_SELECT_ALL);
     OPT_GeneralInformation();
+    OPT_CheckAuth();
+
+    Tre_CheckDB();
+    Tre_GeneralInformation();
 }
 
 /*
@@ -93,7 +103,7 @@ Void WeAlumni::MainWindow::mem_btn_Search_Click(System::Object^ sender, System::
     if (searchAuth->Length)   vec.push_back(7);
     if (vec.size() == 0) {
         mem_lbl_error->ForeColor = System::Drawing::Color::Red;
-        mem_lbl_error->Text = "CANNOT FIND MEMBER";
+        mem_lbl_error->Text = "查无此人";
         mem_lbl_error->Visible = true;
         mem_dataGridView1->DataSource = nullptr;
         return;
@@ -274,13 +284,14 @@ Void WeAlumni::MainWindow::stf_btn_Search_Click(System::Object^ sender, System::
     String^ Name = stf_txt_Name->Text;
     String^ Dept = stf_cmb_Dept->Text;
     String^ Auth = stf_cmb_Auth->Text;
+
     String^ command = "SELECT Staff.MemId    AS 'ID', " +
-        "Member.Name    As 'Name', " +
-        "Member.Gender  AS 'Gender', " +
+        "Member.Name    As '姓名', " +
+        "Member.Gender  AS '性别', " +
         "Member.Email   AS 'Email', " +
-        "Staff.Dept     As 'Department', " +
-        "Staff.Position As 'Position', " +
-        "Staff.Auth     As 'Auth' " +
+        "Staff.Dept     As '所在部门', " +
+        "Staff.Position As '职位职务', " +
+        "Staff.Auth     As '权限等级' " +
         "FROM   Member, Staff " +
         "WHERE Staff.MemId = Member.Id AND ";
     BindingSource^ bSource = gcnew BindingSource();
@@ -295,7 +306,7 @@ Void WeAlumni::MainWindow::stf_btn_Search_Click(System::Object^ sender, System::
         mem_UpdateDataGridView(STF_SELECT_ALL);
         stf_dataGridView->DataSource = nullptr;
         stf_lbl_Error->Visible = true;
-        stf_lbl_Error->Text = "CANNOT FIND STAFF";
+        stf_lbl_Error->Text = "找不到数据";
         return;
     }
 
@@ -303,7 +314,7 @@ Void WeAlumni::MainWindow::stf_btn_Search_Click(System::Object^ sender, System::
     for (auto i : vec) {
         if (vec.size() != 1 && flag) cmd2 += " AND ";
         switch (i) {
-        case 0: cmd2 += "Staff.MemId = " + Convert::ToInt32(Id); break;
+        case 0: cmd2 += "Staff.MemId = '" + Id + "' "; break;
         case 1: cmd2 += "Member.Name = '" + Name + "' "; break;
         case 2: cmd2 += "Staff.Dept = '" + Dept + "' "; break;
         case 3: cmd2 += "Staff.Auth = '" + Auth + "' "; break;
@@ -376,7 +387,7 @@ Void WeAlumni::MainWindow::stf_GeneralInformation() {
         stf_lbl_Count->Text = database->dataReader->GetInt32(0).ToString();
     }
     else {
-        stf_lbl_Error->Text = "Can't find the data";
+        stf_lbl_Error->Text = "找不到数据";
         stf_lbl_Error->Visible = true;
     }
     database->dataReader->Close();
@@ -410,20 +421,34 @@ Void WeAlumni::MainWindow::stf_UpdateDataGridView(String^ command) {
         stf_dataGridView->DataSource = nullptr;
         stf_lbl_Error->Visible = true;
         stf_lbl_Error->ForeColor = System::Drawing::Color::Red;
-        stf_lbl_Error->Text = "CANNOT FIND STAFF";
+        stf_lbl_Error->Text = "找不到数据";
     }
 }
 
 /*
  *  Order
  */
+
  /*
- * ord_btn_Search_Click
- *
- * This method will try to search from Record table for the record of this order
- * and related info from member and item.
- * Then update record to ord_DataGridView
- */
+  * ord_CheckAuth()
+  * Check order Auth. If Level == 1 or 2, user can't see the order mainWindow.
+  * @param None
+  * @return None
+  */
+Void WeAlumni::MainWindow::ord_CheckAuth() {
+    if (_Auth == PublicUserInfo::Auth::Level_1 || _Auth == PublicUserInfo::Auth::Level_2) {
+        tsm_order->Visible = false;
+        pan_order->Visible = false;
+    }
+}
+
+/*
+* ord_btn_Search_Click
+*
+* This method will try to search from Record table for the record of this order
+* and related info from member and item.
+* Then update record to ord_DataGridView
+*/
 Void WeAlumni::MainWindow::ord_btn_Search_Click(System::Object^ sender, System::EventArgs^ e) {
     String^ o_id = ord_txt_ordId->Text;
     String^ status = ord_cmb_Status->Text;
@@ -436,7 +461,7 @@ Void WeAlumni::MainWindow::ord_btn_Search_Click(System::Object^ sender, System::
         " Member.Email AS 'Email'," + "Item.Name AS 'ItmName'," +
         " Orders.Amount AS 'Amount'," + "Item.Price AS 'ItmPrice'," +
         " Orders.Comment AS 'Comment'" +
-        "FROM Orders, Member, Item WHERE ";
+        "FROM Orders, Member, Item WHERE Orders.MemId = Member.Id AND Orders.ItemId = Item.Id AND ";
     String^ cmd2 = "";
 
     std::vector<int> vec;
@@ -467,7 +492,7 @@ Void WeAlumni::MainWindow::ord_btn_Search_Click(System::Object^ sender, System::
         }
         flag = true;
     }
-    cmd += cmd2 + " ORDER BY Member.Id ASC;";
+    cmd += cmd2 + " ORDER BY Orders.Id ASC;";
     ord_UpdateDataGridView(cmd);
     ord_GeneralInformation();
 }
@@ -577,21 +602,34 @@ Void WeAlumni::MainWindow::ord_GeneralInformation() {
 /*
  *  Record
  */
+
  /*
- * Rec_btn_Search_Click
- *
- * This method will try to search from Record table for the record of this record
- * Then update record to rec_DataGridView
- */
+  * Rec_CheckAuth()
+  * Check order Auth. If Level == 1 2, 3, user can't see the record mainWindow.
+  * @param None
+  * @return None
+  */
+Void WeAlumni::MainWindow::Rec_CheckAuth() {
+    if (_Auth == PublicUserInfo::Auth::Level_1 || _Auth == PublicUserInfo::Auth::Level_2 || _Auth == PublicUserInfo::Auth::Level_3) {
+        tsm_record->Visible = false;
+        pan_record->Visible = false;
+    }
+}
+/*
+* Rec_btn_Search_Click
+*
+* This method will try to search from Record table for the record of this record
+* Then update record to rec_DataGridView
+*/
 Void WeAlumni::MainWindow::Rec_btn_Search_Click(System::Object^ sender, System::EventArgs^ e) {
     String^ recId = Rec_txt_RecId->Text;
     String^ stfId = Rec_txt_StfId->Text;
     String^ name = Rec_txt_MemName->Text;
     String^ dept = Rec_txt_department->Text;
-    String^ cmd = "SELECT Record.Id AS 'RecordId', Record.Time AS 'Time'," +
-        " Record.StfId AS 'StfId'," + " Record.Memname AS 'MemName'," +
-        " Staff.Dept AS 'Department'," + "Staff.Position AS 'Position'," +
-        " Record.Action AS 'Action'" + "FROM Record, Staff WHERE ";
+    String^ cmd = "SELECT Record.Id AS 'ID', Record.Time AS '登记时间'," +
+        " Record.StfId AS '员工编号'," + " Record.Memname AS '员工姓名'," +
+        " Staff.Dept AS '所在部门'," + "Staff.Position AS '职位职务'," +
+        " Record.Action AS '操作内容'" + "FROM Record, Staff WHERE Record.MemId = Staff.MemId AND ";
     String^ cmd1 = "";
 
     std::vector<int> vec;
@@ -601,9 +639,10 @@ Void WeAlumni::MainWindow::Rec_btn_Search_Click(System::Object^ sender, System::
     if (dept->Length)            vec.push_back(3);
     if (vec.size() == 0) {
         Rec_lbl_Error->ForeColor = System::Drawing::Color::Red;
-        Rec_lbl_Error->Text = "No RECORD FOUND";
+        Rec_lbl_Error->Text = "未找到记录";
         Rec_lbl_Error->Visible = true;
         Rec_dataGridView->DataSource = nullptr;
+        return;
     }
 
     bool flag = false;
@@ -613,7 +652,7 @@ Void WeAlumni::MainWindow::Rec_btn_Search_Click(System::Object^ sender, System::
         case 0: cmd1 += "Record.Id = '" + Convert::ToInt32(recId) + "' "; break;
         case 1: cmd1 += "Record.StfId = '" + Convert::ToInt32(stfId) + "' "; break;
         case 2: cmd1 += "Record.MemName = '" + name + "' "; break;
-        case 4: cmd1 += "Staff.Dept = '" + dept + "' "; break;
+        case 3: cmd1 += "Staff.Dept = '" + dept + "' "; break;
         }
         flag = true;
     }
@@ -639,10 +678,10 @@ Void WeAlumni::MainWindow::Rec_btn_Clear_Click(System::Object^ sender, System::E
 
 /*
  * Rec_dataGridView_CellDoubleClick
- * by double clicking specific row of ord_dataGridView, a corresponding RecInfoPage will show up.
+ * by double clicking specific row of recc_dataGridView, a corresponding RecInfoPage will show up.
  */
 Void WeAlumni::MainWindow::Rec_dataGridView_CellContentClick(System::Object^ sender, System::Windows::Forms::DataGridViewCellEventArgs^ e) {
-    RecInfoPage^ rip = gcnew RecInfoPage(Convert::ToInt32(ord_dataGridView->CurrentRow->Cells[0]->Value));
+    RecInfoPage^ rip = gcnew RecInfoPage(Convert::ToInt32(Rec_dataGridView->CurrentRow->Cells[0]->Value), _pui);
     rip->ShowDialog();
     Rec_UpdateDataGridView(REC_SELECT_ALL);
     Rec_GeneralInformation();
@@ -667,7 +706,6 @@ Void WeAlumni::MainWindow::Rec_UpdateDataGridView(String^ command) {
         Rec_lbl_Error->Visible = true;
         return;
     }
-
     if (status > 0) {
         Rec_lbl_Error->Visible = false;
         bSource->DataSource = database->dataTable;
@@ -675,7 +713,7 @@ Void WeAlumni::MainWindow::Rec_UpdateDataGridView(String^ command) {
     }
     else {
         Rec_lbl_Error->ForeColor = System::Drawing::Color::Red;
-        Rec_lbl_Error->Text = "CANNOT FIND RECORD";
+        Rec_lbl_Error->Text = "未找到记录";
         Rec_lbl_Error->Visible = true;
         Rec_dataGridView->DataSource = nullptr;
     }
@@ -704,7 +742,7 @@ Void WeAlumni::MainWindow::Rec_GeneralInformation() {
         rec_lbl_Count->Text = database->dataReader->GetInt32(0).ToString();
     }
     else {
-        Rec_lbl_Error->Text = "Can't find data";
+        Rec_lbl_Error->Text = "无相关数据";
         Rec_lbl_Error->Visible = true;
     }
     database->dataReader->Close();
@@ -764,16 +802,16 @@ Void WeAlumni::MainWindow::OPT_btn_Search_Click(System::Object^ sender, System::
     String^ CardNumber = OPT_txt_CardNumber->Text;
 
     String^ command = "SELECT OPT.Id                                                        AS 'OPT编号', " +
-                             "OPT.Status                                                    AS '状态', " +
-                             "(SELECT Member.Name FROM Member WHERE Member.Id = OPT.MemId)  AS '成员姓名', " +
-                             "(SELECT Member.Name FROM Member " +
-                                                 "INNER JOIN Staff INNER JOIN OPT " + 
-                             "WHERE Member.Id = Staff.MemId AND Staff.MemId = OPT.StfId)    AS '员工姓名', " +
-                             "OPT.StartDate                                                 AS '开始日期', " +
-                             "OPT.EndDate                                                   AS '结束日期', " +
-                             "OPT.Title                                                     AS '头衔', " +
-                             "OPT.Position                                                  AS '职位' " +
-                             "FROM OPT INNER JOIN Member WHERE ";
+        "OPT.Status                                                    AS '状态', " +
+        "(SELECT Member.Name FROM Member WHERE Member.Id = OPT.MemId)  AS '成员姓名', " +
+        "(SELECT Member.Name FROM Member " +
+        "INNER JOIN Staff INNER JOIN OPT " +
+        "WHERE Member.Id = Staff.MemId AND Staff.MemId = OPT.StfId)    AS '员工姓名', " +
+        "OPT.StartDate                                                 AS '开始日期', " +
+        "OPT.EndDate                                                   AS '结束日期', " +
+        "OPT.Title                                                     AS '头衔', " +
+        "OPT.Position                                                  AS '职位' " +
+        "FROM OPT INNER JOIN Member WHERE ";
     String^ command2 = "";
 
     std::vector<int> vec;
@@ -784,6 +822,7 @@ Void WeAlumni::MainWindow::OPT_btn_Search_Click(System::Object^ sender, System::
     if (CardNumber->Length)    vec.push_back(4);
     if (vec.size() == 0) {
         OPT_UpdateDataGridView(OPT_SELECT_ALL);
+        OPT_lbl_Prompt_default->Visible = true;
         return;
     }
 
@@ -864,5 +903,226 @@ Void WeAlumni::MainWindow::OPT_GeneralInformation() {
     }
     else {
         OPT_lbl_Count->Text = Convert::ToString(OPT_dataGridView->RowCount - 1);
+    }
+}
+
+/*
+<<<<<<< HEAD
+=======
+ * OPT_CheckAuth()
+ * Check auth of current user
+ * @param None
+ * @return None
+ */
+Void WeAlumni::MainWindow::OPT_CheckAuth() {
+    if (_Auth == PublicUserInfo::Auth::Level_1 || _Auth == PublicUserInfo::Auth::Level_2) {
+        tsm_OPT->Visible = false;
+        pan_OPT->Visible = false;
+    }
+}
+
+/*
+>>>>>>> a683c45b1dcc9c9aa910360d7978338217ec720e
+ *  System
+ */
+
+ /*
+  *   tmsi_ChangeUserInfo_Click()
+  *   Show change username/password page
+  *   @param None
+  *   @return None
+  */
+Void WeAlumni::MainWindow::tmsi_ChangeUserInfo_Click(System::Object^ sender, System::EventArgs^ e) {
+    SysChangeUserInfoPage^ page = gcnew SysChangeUserInfoPage(_pui);
+    page->ShowDialog();
+}
+
+/*
+ *   tsmi_VersionInfo_Click()
+ *   Show version information
+ *   @param None
+ *   @return None
+ */
+Void WeAlumni::MainWindow::tsmi_VersionInfo_Click(System::Object^ sender, System::EventArgs^ e) {
+    SysInfoPage^ page = gcnew SysInfoPage();
+    page->ShowDialog();
+}
+
+/*
+ *
+ *  Treasury
+ *
+ */
+
+ /*
+  * Tre_UpdateDataGridView()
+  * Update DataGridView
+  * @param None
+  * @return None
+  */
+Void WeAlumni::MainWindow::Tre_UpdateDataGridView(String^ command) {
+    BindingSource^ bSource = gcnew BindingSource();
+    int status = -1;
+
+    try {
+        status = _TreDB->ReadDataAdapter(command);
+    }
+    catch (Exception^ exception) {
+        tre_lbl_error->ForeColor = System::Drawing::Color::Red;
+        tre_lbl_error->Text = exception->Message;
+        tre_lbl_error->Visible = true;
+        return;
+    }
+
+    if (status > 0) {
+        tre_lbl_error->Visible = false;
+        bSource->DataSource = _TreDB->dataTable;
+        tre_dataGridView->DataSource = bSource;
+    }
+    else {
+        tre_lbl_error->ForeColor = System::Drawing::Color::Red;
+        tre_lbl_error->Text = "无可查询的财务信息";
+        tre_lbl_error->Visible = true;
+        tre_dataGridView->DataSource = nullptr;
+    }
+}
+
+/*
+ * Tre_btn_Search_Click()
+ * Search data with provided info
+ * @param None
+ * @return None
+ */
+Void WeAlumni::MainWindow::Tre_btn_Search_Click(System::Object^ sender, System::EventArgs^ e) {
+    String^ TreId = tre_txt_treId->Text;
+    String^ TreType = tre_cmb_type->Text;
+
+    String^ command = "SELECT Treasury.Id AS '财务编号', " +
+        "Treasury.StfName AS '成员姓名', " +
+        "Treasury.Time AS '登记时间', " +
+        "Treasury.type AS '类型', " +
+        "Treasury.Amount AS '金额', " +
+        "Treasury.Comment AS '备注' " +
+        "FROM Treasury WHERE ";
+    String^ command2 = "";
+
+    std::vector<int> vec;
+    if (TreId->Length)         vec.push_back(0);
+    if (TreType->Length)        vec.push_back(1);
+    if (vec.size() == 0) {
+        Tre_CheckAuth();
+        Tre_GeneralInformation();
+        return;
+    }
+
+    bool flag = false;
+    for (auto i : vec) {
+        if (vec.size() != 1 && flag) command2 += " AND ";
+        switch (i) {
+        case 0: command2 += "Treasury.Id = '" + TreId + "' "; break;
+        case 1: command2 += "Treasury.type = '" + TreType + "' "; break;
+        }
+        flag = true;
+    }
+
+    if (!_Auth.Equals(PublicUserInfo::Auth::Level_5)) {
+        command2 += " AND Treasury.StfId = " + Convert::ToString(_pui->GetId());
+    }
+    command += command2 + " ORDER BY Treasury.Id ASC;";
+
+    Tre_UpdateDataGridView(command);
+    Tre_GeneralInformation();
+}
+
+/*
+ * Tre_btn_Clear_Click()
+ * Reset all textboxs and DataGridView
+ * @param None
+ * @return None
+ */
+Void WeAlumni::MainWindow::Tre_btn_Clear_Click(System::Object^ sender, System::EventArgs^ e) {
+    tre_txt_treId->Text = "";
+    tre_cmb_type->Text = "";
+    Tre_CheckAuth();
+    Tre_GeneralInformation();
+}
+
+/*
+ * Tre_dataGridView_CellDoubleClick()
+ * Open Treasury InfoPage when double click a row
+ * @param None
+ * @return None
+ */
+Void WeAlumni::MainWindow::Tre_dataGridView_CellDoubleClick(System::Object^ sender, System::Windows::Forms::DataGridViewCellEventArgs^ e) {
+
+    TreInfoPage^ page = gcnew TreInfoPage(_pui, Convert::ToInt32(tre_dataGridView->CurrentRow->Cells[0]->Value));
+    page->ShowDialog();
+    Tre_CheckAuth();
+    Tre_GeneralInformation();
+
+}
+
+/*
+ * Tre_btn_New_Click()
+ * Open OPT AddPage for adding new Treasury record
+ * @param None
+ * @return None
+ */
+Void WeAlumni::MainWindow::Tre_btn_New_Click(System::Object^ sender, System::EventArgs^ e) {
+    TreAddPage^ page = gcnew TreAddPage(_pui);
+    page->ShowDialog();
+    Tre_CheckAuth();
+    Tre_GeneralInformation();
+
+}
+
+/*
+ * Tre_GeneralInformation()
+ * Provide total number of rows in DataGridView
+ * @param None
+ * @return None
+ */
+Void WeAlumni::MainWindow::Tre_GeneralInformation() {
+    int^ count = tre_dataGridView->RowCount;
+    if (Convert::ToInt32(count) == 0) {
+        tre_lbl_count->Text = "0";
+    }
+    else {
+        tre_lbl_count->Text = Convert::ToString(tre_dataGridView->RowCount - 1);
+    }
+}
+
+/*
+ * Tre_CheckAuth
+ * Show Data Depend on Authority
+ * @param None
+ * @return None
+ */
+Void WeAlumni::MainWindow::Tre_CheckAuth() {
+    if (_Auth.Equals(PublicUserInfo::Auth::Level_5)) {
+        Tre_UpdateDataGridView(TRE_LEVEL5);
+    }
+    else {
+        String^ cmd = TRE_Normal + Convert::ToString(_pui->GetId()) + " ORDER BY Treasury.Id ASC;";
+        Tre_UpdateDataGridView(cmd);
+    }
+}
+
+
+/*
+ * Tre_CheckDB()
+ * Check threasury Data base
+ * @param None
+ * @return None
+ */
+void WeAlumni::MainWindow::Tre_CheckDB() {
+    if (DatabasePrecheck::TrePrecheck()) {
+        _TreDB = gcnew Database(Database::DatabaseType::Treasury);
+        Tre_CheckAuth();
+    }
+    else {
+        tre_lbl_error->Text = "错误：无法读取数据库，请重新导入数据库或退出.";
+        tre_lbl_error->ForeColor = System::Drawing::Color::Red;
+
     }
 }
